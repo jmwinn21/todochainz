@@ -2,11 +2,11 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -19,7 +19,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var todoFile = "./todochainz.json"
+var todoFile = "./todochainz.gob"
 
 type Todo struct {
 	Index         int       `json:"index"`
@@ -109,11 +109,30 @@ func replaceChain(newTodos []Todo) {
 	if len(newTodos) > len(TodoChain) {
 		TodoChain = newTodos
 	}
-	chainJson, _ := json.Marshal(TodoChain)
-	err := ioutil.WriteFile(todoFile, chainJson, 0644)
+	err := saveFile(TodoChain)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func saveFile(object interface{}) error {
+	file, err := os.Create(todoFile)
+	if err == nil {
+		encoder := gob.NewEncoder(file)
+		encoder.Encode(object)
+	}
+	file.Close()
+	return err
+}
+
+func loadFile(object interface{}) error {
+	file, err := os.Open(todoFile)
+	if err == nil {
+		decoder := gob.NewDecoder(file)
+		err = decoder.Decode(object)
+	}
+	file.Close()
+	return err
 }
 
 func run() error {
@@ -306,13 +325,11 @@ func main() {
 			TodoChain = append(TodoChain, genesisTodo)
 			replaceChain(TodoChain)
 		} else {
-			// TODO: fix the loading of data, something is wrong here
-			raw, err := ioutil.ReadFile(todoFile)
+			var todos []Todo
+			err = loadFile(&todos)
 			if err != nil {
 				log.Fatal(err)
 			}
-			var todos []Todo
-			json.Unmarshal(raw, todos)
 			replaceChain(todos)
 		}
 	}()
