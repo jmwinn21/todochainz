@@ -250,6 +250,7 @@ func handleCompleteTodo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t := time.Now()
+	completeTodo.DeleteStamp = originalTodo.DeleteStamp
 	completeTodo.UpdateStamp = t
 	completeTodo.CompleteStamp = t
 	if isTodoValid(completeTodo, TodoChain[len(TodoChain)-1]) {
@@ -282,6 +283,7 @@ func handleDeleteTodo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t := time.Now()
+	completeTodo.CompleteStamp = originalTodo.CompleteStamp
 	completeTodo.UpdateStamp = t
 	completeTodo.DeleteStamp = t
 	if isTodoValid(completeTodo, TodoChain[len(TodoChain)-1]) {
