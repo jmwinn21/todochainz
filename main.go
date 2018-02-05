@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/gorilla/mux"
 )
+
+var todoFile = "./todochainz.json"
 
 type Todo struct {
 	Index         int       `json:"index"`
@@ -106,6 +109,11 @@ func replaceChain(newTodos []Todo) {
 	if len(newTodos) > len(TodoChain) {
 		TodoChain = newTodos
 	}
+	chainJson, _ := json.Marshal(TodoChain)
+	err := ioutil.WriteFile(todoFile, chainJson, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func run() error {
@@ -131,6 +139,7 @@ func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
 	muxRouter.HandleFunc("/", handleGetTodoChain).Methods("GET")
 	muxRouter.HandleFunc("/", handleCreateTodo).Methods("POST")
+	muxRouter.HandleFunc("/{hash}", handleCompleteTodo).Methods("POST")
 	muxRouter.HandleFunc("/{hash}", handleUpdateTodo).Methods("PUT")
 	muxRouter.HandleFunc("/{hash}", handleDeleteTodo).Methods("DELETE")
 	return muxRouter
@@ -284,16 +293,28 @@ func main() {
 	}
 
 	go func() {
-		t := time.Now()
-		genesisTodo := Todo{
-			Index:       0,
-			Title:       "Genesis Todo",
-			Notes:       "Genesis Notes",
-			CreateStamp: t,
+		if _, err := os.Stat(todoFile); os.IsNotExist(err) {
+			t := time.Now()
+			genesisTodo := Todo{
+				Index:       0,
+				Title:       "Genesis Todo",
+				Notes:       "Genesis Notes",
+				CreateStamp: t,
+			}
+			genesisTodo.Hash = calculateHash(genesisTodo)
+			spew.Dump(genesisTodo)
+			TodoChain = append(TodoChain, genesisTodo)
+			replaceChain(TodoChain)
+		} else {
+			// TODO: fix the loading of data, something is wrong here
+			raw, err := ioutil.ReadFile(todoFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			var todos []Todo
+			json.Unmarshal(raw, todos)
+			replaceChain(todos)
 		}
-		genesisTodo.Hash = calculateHash(genesisTodo)
-		spew.Dump(genesisTodo)
-		TodoChain = append(TodoChain, genesisTodo)
 	}()
 	log.Fatal(run())
 }

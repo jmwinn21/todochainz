@@ -1,0 +1,32 @@
+// The requests in this file work well with the REST Client (https://marketplace.visualstudio.com/items?itemName=humao.rest-client) extension for VS Code
+
+// Get All todos
+GET http://localhost:8080 HTTP/1.1
+content-type: application/json
+
+// Create a new todo
+POST http://localhost:8080 HTTP/1.1
+content-type: application/json
+
+{
+    "title": "TodoChainz!!",
+    "notes": "Make money"
+}
+
+// Update a todo
+// replace the hash with a valid hash from the GET call
+PUT http://localhost:8080/1364c0e8d009b990a5c0b02c56eee384d3a2ca4c02c6ff14bcc7433e6a11dd5b
+content-type: application/json
+
+ {
+    "title": "TodoChainz!!",
+    "notes": "money made"
+}
+
+// Mark a todo as complete
+// replace the hash with a valid hash from the GET call
+POST http://localhost:8080/1364c0e8d009b990a5c0b02c56eee384d3a2ca4c02c6ff14bcc7433e6a11dd5b
+
+// Mark a todo as deleted
+// replace the hash with a valid hash from the GET call
+DELETE http://localhost:8080/1364c0e8d009b990a5c0b02c56eee384d3a2ca4c02c6ff14bcc7433e6a11dd5b
