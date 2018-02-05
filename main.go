@@ -34,6 +34,11 @@ type Todo struct {
 	PrevHash      string    `json:"prev_hash"`
 }
 
+type TodoDetail struct {
+	OriginalTodo Todo   `json:"original_todo,omitempty"`
+	Updates      []Todo `json:"updates,omitempty"`
+}
+
 type TodoMessage struct {
 	Title    string `json:"title"`
 	Notes    string `json:"notes"`
@@ -105,6 +110,27 @@ func findTodo(hash string, chain []Todo) (*Todo, error) {
 	return nil, err
 }
 
+func loadTodoDetail(hash string, chain []Todo) (*TodoDetail, error) {
+	var todoDetail TodoDetail
+	for _, td := range chain {
+		if td.Hash == hash {
+			todoDetail.OriginalTodo = td
+		}
+		//TODO: order the updates list by date ascending
+		if td.OrigHash == hash {
+			todoDetail.Updates = append(todoDetail.Updates, td)
+		}
+	}
+
+	var err error
+	if todoDetail.OriginalTodo.Hash == "" {
+		err = errors.New("original todo not found")
+		return nil, err
+	}
+
+	return &todoDetail, nil
+}
+
 func replaceChain(newTodos []Todo) {
 	if len(newTodos) > len(TodoChain) {
 		TodoChain = newTodos
@@ -156,11 +182,12 @@ func run() error {
 
 func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
-	muxRouter.HandleFunc("/", handleGetTodoChain).Methods("GET")
-	muxRouter.HandleFunc("/", handleCreateTodo).Methods("POST")
-	muxRouter.HandleFunc("/{hash}", handleCompleteTodo).Methods("POST")
-	muxRouter.HandleFunc("/{hash}", handleUpdateTodo).Methods("PUT")
-	muxRouter.HandleFunc("/{hash}", handleDeleteTodo).Methods("DELETE")
+	muxRouter.HandleFunc("/api/", handleGetTodoChain).Methods("GET")
+	muxRouter.HandleFunc("/api/", handleCreateTodo).Methods("POST")
+	muxRouter.HandleFunc("/api/{hash}", handleGetTodo).Methods("GET")
+	muxRouter.HandleFunc("/api/{hash}", handleCompleteTodo).Methods("POST")
+	muxRouter.HandleFunc("/api/{hash}", handleUpdateTodo).Methods("PUT")
+	muxRouter.HandleFunc("/api/{hash}", handleDeleteTodo).Methods("DELETE")
 	return muxRouter
 }
 
@@ -172,6 +199,21 @@ func handleGetTodoChain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	io.WriteString(w, string(bytes))
+}
+
+func handleGetTodo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	hash := vars["hash"]
+
+	detail, err := loadTodoDetail(hash, TodoChain)
+	if err != nil {
+		respondWithJSON(w, r, http.StatusNotFound, detail)
+		return
+	}
+
+	respondWithJSON(w, r, http.StatusOK, detail)
+	return
 }
 
 func handleCreateTodo(w http.ResponseWriter, r *http.Request) {
@@ -200,6 +242,8 @@ func handleCreateTodo(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, r, http.StatusCreated, newTodo)
 }
 
+// TODO: whenever updating an existing todo make sure that
+// we are using the latest values for the todo
 func handleUpdateTodo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
@@ -229,6 +273,8 @@ func handleUpdateTodo(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, r, http.StatusOK, updateTodo)
 }
 
+// TODO: whenever updating an existing todo make sure that
+// we are using the latest values for the todo
 func handleCompleteTodo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
@@ -262,6 +308,8 @@ func handleCompleteTodo(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, r, http.StatusOK, completeTodo)
 }
 
+// TODO: whenever updating an existing todo make sure that
+// we are using the latest values for the todo
 func handleDeleteTodo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
