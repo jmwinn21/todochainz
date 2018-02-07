@@ -1,0 +1,11 @@
+<h1>Welcome to Todochainz!</h1>
+
+<%= if (todos && len(todos) > 0) { %>
+  <ul>
+    <%= for (todo) in todos { %>
+      <li><%= todo.Title %></li>
+    <% } %>
+  </ul>
+<% } else { %>
+  <h2>Nothing to do!</h2>
+<% } %>

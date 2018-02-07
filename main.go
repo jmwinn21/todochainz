@@ -7,16 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/joho/godotenv"
-
 	"github.com/davecgh/go-spew/spew"
-
+	"github.com/gobuffalo/plush"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 var todoFile = "./todochainz.gob"
@@ -47,12 +47,15 @@ type TodoMessage struct {
 
 var TodoChain []Todo
 
-func calculateHash(todo Todo) string {
+func calculateHash(todo Todo) (string, error) {
 	hashText := string(todo.Index) + todo.Title + todo.Notes + todo.CreateStamp.String() + todo.PrevHash
 	h := sha256.New()
-	h.Write([]byte(hashText))
+	_, err := h.Write([]byte(hashText))
+	if err != nil {
+		return "", err
+	}
 	hashed := h.Sum(nil)
-	return hex.EncodeToString(hashed)
+	return hex.EncodeToString(hashed), nil
 }
 
 func generateBlock(oldTodo Todo, message TodoMessage) (Todo, error) {
@@ -65,7 +68,11 @@ func generateBlock(oldTodo Todo, message TodoMessage) (Todo, error) {
 	newTodo.Title = message.Title
 	newTodo.Notes = message.Notes
 	newTodo.PrevHash = oldTodo.Hash
-	newTodo.Hash = calculateHash(newTodo)
+	hash, err := calculateHash(newTodo)
+	if err != nil {
+		return newTodo, err
+	}
+	newTodo.Hash = hash
 
 	if message.OrigHash != "" {
 		newTodo.OrigHash = message.OrigHash
@@ -83,7 +90,8 @@ func isTodoValid(newTodo, oldTodo Todo) bool {
 		return false
 	}
 
-	if calculateHash(newTodo) != newTodo.Hash {
+	hash, err := calculateHash(newTodo)
+	if err != nil || hash != newTodo.Hash {
 		return false
 	}
 
@@ -182,6 +190,7 @@ func run() error {
 
 func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
+	muxRouter.HandleFunc("/", handleGetIndex).Methods("GET")
 	muxRouter.HandleFunc("/api/", handleGetTodoChain).Methods("GET")
 	muxRouter.HandleFunc("/api/", handleCreateTodo).Methods("POST")
 	muxRouter.HandleFunc("/api/{hash}", handleGetTodo).Methods("GET")
@@ -189,6 +198,20 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api/{hash}", handleUpdateTodo).Methods("PUT")
 	muxRouter.HandleFunc("/api/{hash}", handleDeleteTodo).Methods("DELETE")
 	return muxRouter
+}
+
+func handleGetIndex(w http.ResponseWriter, r *http.Request) {
+	ctx := plush.NewContext()
+	ctx.Set("todos", TodoChain)
+	file, err := ioutil.ReadFile("./templates/" + "index.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	s, err := plush.Render(string(file), ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	w.Write([]byte(s))
 }
 
 func handleGetTodoChain(w http.ResponseWriter, r *http.Request) {
@@ -370,7 +393,11 @@ func main() {
 				Notes:       "Genesis Notes",
 				CreateStamp: t,
 			}
-			genesisTodo.Hash = calculateHash(genesisTodo)
+			genesisTodo.Hash, err = calculateHash(genesisTodo)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			spew.Dump(genesisTodo)
 			TodoChain = append(TodoChain, genesisTodo)
 			replaceChain(TodoChain)
