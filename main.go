@@ -45,7 +45,9 @@ type TodoMessage struct {
 	OrigHash string `json:"orig_hash,omitempty"`
 }
 
-var TodoChain []Todo
+type todoChain []Todo
+
+var TodoChain todoChain
 
 func calculateHash(todo Todo) string {
 	hashText := string(todo.Index) + todo.Title + todo.Notes + todo.CreateStamp.String() + todo.PrevHash
@@ -53,6 +55,18 @@ func calculateHash(todo Todo) string {
 	h.Write([]byte(hashText))
 	hashed := h.Sum(nil)
 	return hex.EncodeToString(hashed)
+}
+
+func (t todoChain) Len() int {
+	return len(t)
+}
+
+func (t todoChain) Less(i, j int) bool {
+	return t[i].CreateStamp.Before(t[j].CreateStamp)
+}
+
+func (t todoChain) Swap(i, j int) {
+	t[i], t[j] = t[j], t[i]
 }
 
 func generateBlock(oldTodo Todo, message TodoMessage) (Todo, error) {
@@ -117,6 +131,7 @@ func loadTodoDetail(hash string, chain []Todo) (*TodoDetail, error) {
 			todoDetail.OriginalTodo = td
 		}
 		//TODO: order the updates list by date ascending
+		// https://gist.github.com/xigang/827e342fc2580198f625ce272257ef37
 		if td.OrigHash == hash {
 			todoDetail.Updates = append(todoDetail.Updates, td)
 		}
